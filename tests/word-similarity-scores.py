@@ -21,13 +21,13 @@ Dataset = namedtuple("Dataset", "first second similarity scale postproc")
 
 DATASETS = {
     "mc-30.csv": Dataset(1, 2, 3 ,4, lambda x: x),
-    "men.csv": Dataset(1, 2, 3, 100, lambda x: x[:-2]),
+    "men.csv": Dataset(1, 2, 3, 50, lambda x: x[:-2]),
     "mturk-287.csv": Dataset(1, 2, 3, 5, lambda x: x),
     "mturk-771.csv": Dataset(1, 2, 3, 5, lambda x: x),
     "rg-65.csv": Dataset(1, 2, 3, 4, lambda x: x),
     "rw.csv": Dataset(1, 2, 3, 10, lambda x: x),
     "semeval17.csv": Dataset(1, 2, 3, 4, lambda x: x),
-    "simverb-3500.csv": Dataset(2, 3, 1, 10, lambda x: x),
+    "simverb-3500.csv": Dataset(2, 3, 1, 4, lambda x: x),
     "verb-143.csv": Dataset(1, 2, 3, 4, lambda x: x),
     "wordsim353-rel.csv": Dataset(1, 2, 3, 10, lambda x: x),
     "wordsim353-sim.csv": Dataset(1, 2, 3, 10, lambda x: x),
