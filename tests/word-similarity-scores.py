@@ -36,7 +36,6 @@ DATASETS = {
 
 
 def load_dataset(name, path):
-    print(path)
     with open(path) as f:
         csv_data = csv.reader(f)
 
