@@ -79,7 +79,7 @@ def score_model(model, datasets):
 
 def load_model(name):
     """Load a model."""
-    return KeyedVectors.load(name)
+    return KeyedVectors.load(name).wv
 
 
 def main():
