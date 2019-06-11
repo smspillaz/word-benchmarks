@@ -1,8 +1,14 @@
-# Benchmarks for intrinsic evaluation word embeddings
+# Benchmarks and code for intrinsic evaluation word embeddings
 
-## **THE DEVELOPMENT STOPPED, PROJECT TRANSFERRED TO [VECTO](https://github.com/vecto-ai)**
+This repository adds code to reproduce the relevant benchmarks, adapted from their relevant papers. Instructions
+for running can be found under each section.
+
+To just run all the tests, use `./run-tests.sh WORD_VECTORS` where `WORD_VECTORS` is
+a pickled `gensim.KeyedVectors` object.
 
 ### 1. Word semantic similarity ####
+
+`python word-similarity-scores.py $VECTORS --data-dir ../word-similarity/monolingual/en/`
 
 This method is based on an idea that the distances between words in an embedding space could be evaluated through the human heuristic judgments on the actual semantic distances between these words (e.g., the distance between *cup* and *mug* defined in an continuous interval {0,1} would be 0.8 since these words are synonymous, but not really the same thing). The assessor is given a set of pairs of words and asked to assess the degree of similarity for each pair. The distances between these pairs are also collected in a word embeddings space, and the two obtained distances sets are compared. The more similar they are, the better are embeddings
 
@@ -23,6 +29,8 @@ This method is based on an idea that the distances between words in an embedding
 
 ### 2. Word analogy
 
+`python analogy.py $VECTORS  --data-dir ../word-analogy/monolingual/en/`
+
 This evaluation method (in certain works also called *analogical reasoning*, *linguistic regularities* and *word semantic coherence*) is the second most popular method of word embeddings evaluation. It is based on the idea that arithmetic operations in a word vector space could be predicted by humans: given a set of three words, $a$, $a*$ and $b$, the task is to identify such word $b*$ that the relation $b$:$b*$ is the same as the relation $a$:$a*$. For instance, one has words $a=Paris$, $b=France$, $c=Moscow$. Then the target word would be $Russia$ since the relation $a:b$ is $capital:country$, so one needs need to find the capital of which country is *Moscow*.
 
 1. **WordRep**, 118 292 623 *analogy questions* (4-word tuples) divided into 26 semantic classes, a superset of *Google Analogy* with additional data from WordNet.
@@ -36,6 +44,8 @@ morphology*, *lexicographic semantics* and *encyclopedic semantics*) and 10 smal
 
 ### 3. Concept categorization
 
+`python cluster.py $VECTORS  --data-dir ../word-categorization/monolingual/en/`
+
 This method (also called *word clustering*) evaluates an ability of word embeddings space to be clustered. Given a set of words, the task is to split it into subsets of words belonging to different categories (for example, for words $dog$, $elephant$, $robin$, $crow$ the first two make one cluster which is $mammals$ and the last two form another second cluster which is $birds$; the cluster name is not necessary to be formulated). The amount of clusters should be defined. Possible critique of such method could address the question of either choosing the most appropriate clustering algorithm or choosing the most adequate metric for evaluating clustering quality.
 
 1. **BM** (acronym for Battig and Montague), 5 321 words  divided into 56 categories.
@@ -44,6 +54,8 @@ This method (also called *word clustering*) evaluates an ability of word embeddi
 4. **ESSLLI-2008** (acronym for the European Summer School in Logic, Language and Information), 45 words divided into 9 semantic classes (or 5 in less detailed categorization); the dataset was used in a shared task on a *Lexical Semantics Workshop on ESSLI-2008*.
 
 ### 4. Outlier word detection
+
+`python outlier.py $VECTORS  --data-dir ../outlier-detection/monolingual/en/`
 
 This method evaluates the same feature of word embeddings as the word categorization method (it also proposes clustering), but the task is not to divide a set of words into certain amount of clusters, but to identify a semantically anomalous word in an already formed cluster (for example, for a set $\{orange, banana, lemon, book, orange\}$ which are mostly fruits, the word $book$ is the outlier since it is not a fruit).
 
