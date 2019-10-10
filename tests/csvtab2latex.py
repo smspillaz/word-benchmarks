@@ -52,7 +52,7 @@ def main():
     lines = pd.read_csv(args.csv).T.reset_index().values.tolist()
 
     header, lines = lines[:1], lines[1:]
-    header = ["Dataset"] + [re.sub(r".*?([0-9\.]+).*", r"\1", s) for s in header[0][1:]]
+    header = ["Dataset"] + [re.sub(r"(.*)?\.([0-9]+).*", r"\1 \2", s) for s in header[0][1:]]
     sort_indices = np.argsort([int(re.sub(r".*?([0-9]+).*", r"\1", h)) for h in header[1:]])
     header = header[:1] + [header[1:][i] for i in sort_indices]
     lines = [
