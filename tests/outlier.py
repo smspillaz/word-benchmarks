@@ -43,6 +43,10 @@ DATASETS = {
 }
 
 
+def filter_invalid(wordset):
+    return [x for x in wordset if len(x)]
+
+
 def load_dataset(name, path):
     with open(path) as f:
         csv_data = csv.reader(f)
