@@ -30,6 +30,10 @@ from gensim.models import KeyedVectors
 
 from sklearn.metrics.pairwise import cosine_similarity
 
+from tqdm.auto import tqdm
+
+from util import make_vec, make_tokenizer
+
 
 Dataset = namedtuple("Dataset", "outliers cluster")
 
@@ -55,16 +59,20 @@ def load_dataset(name, path):
             outliers = json.loads(re.sub("(?<=[\[\s,])'|'(?=[\]\s,])", "\"", row[metadata.outliers].strip()))
             cluster = json.loads(re.sub("(?<=[\[\s,])'|'(?=[\]\s,])", "\"", row[metadata.cluster].strip()))
 
-            yield outliers, cluster
+            yield filter_invalid(outliers), filter_invalid(cluster)
 
 
-def vectorize_word(word, model):
+def vectorize_word(word, model, tokenizer):
     """Vectorize the word.
 
     First try to get the vectors directly, then if that fails, split
     it on _ and " " to get the subword vectors. If that fails for any
     part of the word, throw an exception.
     """
+    tfunc = tokenizer.tokenize if tokenizer else lambda x: [x]
+    if tokenizer:
+        return make_vec(model, tfunc(word))
+
     if word in model.vocab:
         return model[word]
 
@@ -79,10 +87,10 @@ def vectorize_word(word, model):
     ]), axis=0)
 
 
-def process_cluster(words, model):
+def process_cluster(words, model, tokenizer):
     for word in words:
         try:
-            yield vectorize_word(word, model)
+            yield vectorize_word(word, model, tokenizer)
         except KeyError:
             pass
 
@@ -112,9 +120,9 @@ def score_outliers(model, vectorized_outliers, vectorized_cluster):
         yield list(reversed(np.argsort(p_scores)))[-1]
 
 
-def score_cluster(model, outliers, cluster):
-    vectorized_outliers = np.array(list(process_cluster(outliers, model)))
-    vectorized_cluster = np.array(list(process_cluster(cluster, model)))
+def score_cluster(model, outliers, cluster, tokenizer):
+    vectorized_outliers = np.array(list(process_cluster(outliers, model, tokenizer)))
+    vectorized_cluster = np.array(list(process_cluster(cluster, model, tokenizer)))
 
     if not len(vectorized_outliers) or not len(vectorized_cluster):
         return None
@@ -127,19 +135,20 @@ def score_cluster(model, outliers, cluster):
 
 
 
-def score_dataset(model, dataset):
+def score_dataset(model, dataset, tokenizer):
     """Get score for one dataset for a given KeyedVectors model."""
     cluster_scores = list(filter(lambda x: x is not None, [
-        score_cluster(model, outliers, cluster) for outliers, cluster in dataset
+        score_cluster(model, outliers, cluster, tokenizer)
+        for outliers, cluster in tqdm(dataset, desc="Processing dataset")
     ]))
     return np.mean(cluster_scores) if cluster_scores else 0
 
 
-def score_model(model, datasets):
+def score_model(model, datasets, tokenizer):
     """Get scores for all datasets."""
 
-    for dataset_name in sorted(datasets.keys()):
-        yield score_dataset(model, datasets[dataset_name])
+    for dataset_name in tqdm(sorted(datasets.keys()), desc="Processing Datasets"):
+        yield score_dataset(model, datasets[dataset_name], tokenizer)
 
 
 def load_model(name):
@@ -153,6 +162,7 @@ def main():
     parser.add_argument("models", nargs="+")
     parser.add_argument("--benchmarks", nargs="+", default=list(DATASETS.keys()))
     parser.add_argument("--data-dir", type=str, help="Path to data")
+    parser.add_argument("--tokenizer", type=str, help="Tokenizer to use")
     args = parser.parse_args()
 
     models = {
@@ -165,8 +175,9 @@ def main():
 
     output = csv.writer(sys.stdout)
     output.writerow(['model'] + sorted(datasets.keys()))
-    for model_name in sorted(models.keys()):
-        output.writerow([model_name] + list(score_model(models[model_name], datasets)))
+    tokenizer = make_tokenizer(args.tokenizer)
+    for model_name in tqdm(sorted(models.keys()), desc="Processing Models"):
+        output.writerow([model_name] + list(score_model(models[model_name], datasets, tokenizer)))
 
 
 if __name__ == "__main__":

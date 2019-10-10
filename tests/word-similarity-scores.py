@@ -16,6 +16,12 @@ import numpy as np
 from collections import namedtuple
 from gensim.models import KeyedVectors
 
+from sklearn.metrics.pairwise import cosine_similarity
+
+from tqdm.auto import tqdm
+
+from util import make_vec, make_tokenizer
+
 
 Dataset = namedtuple("Dataset", "first second similarity scale postproc")
 
@@ -50,21 +56,26 @@ def load_dataset(name, path):
             yield first, second, similarity
 
 
-def score_dataset(model, dataset):
+def score_dataset(model, dataset, tokenizer):
     """Get score for one dataset for a given KeyedVectors model."""
+    tfunc = tokenizer.tokenize if tokenizer is not None else lambda x: [x]
     similarities = [
-        abs(model.similarity(first, second) - similarity)
-        for first, second, similarity in dataset
-        if first in model.vocab and second in model.vocab
+        abs(
+            cosine_similarity(np.array([make_vec(model, tfunc(first))]),
+                              np.array([make_vec(model, tfunc(second))]))[0] -
+            similarity
+        )
+        for first, second, similarity in tqdm(dataset, "Processing Dataset")
+        if tokenizer is not None or (first in model.vocab and second in model.vocab)
     ]
     return np.mean(similarities)
 
 
-def score_model(model, datasets):
+def score_model(model, datasets, tokenizer):
     """Get scores for all datasets."""
 
-    for dataset_name in sorted(datasets.keys()):
-        yield score_dataset(model, datasets[dataset_name])
+    for dataset_name in tqdm(sorted(datasets.keys()), desc="Processing Datasets"):
+        yield score_dataset(model, datasets[dataset_name], tokenizer)
 
 
 def load_model(name):
@@ -78,6 +89,7 @@ def main():
     parser.add_argument("models", nargs="+")
     parser.add_argument("--benchmarks", nargs="+", default=list(DATASETS.keys()))
     parser.add_argument("--data-dir", type=str, help="Path to data")
+    parser.add_argument("--tokenizer", type=str, help="Tokenizer to use")
     args = parser.parse_args()
 
     datasets = {
@@ -86,11 +98,12 @@ def main():
     models = {
         os.path.basename(n): load_model(n) for n in args.models
     }
+    tokenizer = make_tokenizer(args.tokenizer)
 
     output = csv.writer(sys.stdout)
     output.writerow(['model'] + sorted(datasets.keys()))
     for model_name in sorted(models.keys()):
-        output.writerow([model_name] + list(score_model(models[model_name], datasets)))
+        output.writerow([model_name] + list(score_model(models[model_name], datasets, tokenizer)))
 
 
 if __name__ == "__main__":

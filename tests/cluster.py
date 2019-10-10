@@ -28,6 +28,10 @@ from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import normalized_mutual_info_score
 
+from tqdm.auto import tqdm
+
+from util import make_vec, make_tokenizer
+
 
 Dataset = namedtuple("Dataset", "label item")
 
@@ -88,36 +92,40 @@ def try_vectorize_word(word, model):
         return None
 
 
-def yield_item_vectors(clusters, model):
-    for cluster in clusters:
-        cluster_vectors = [model[item] for item in cluster if item in model.vocab]
+def yield_item_vectors(clusters, model, tokenizer):
+    tfunc = tokenizer.tokenize if tokenizer is not None else lambda x: [x]
+    for cluster in tqdm(clusters, desc="Processing clusters"):
+        cluster_vectors = [
+            make_vec(model, tfunc(item))
+            for item in cluster if tokenizer is not None or item in model.vocab
+        ]
         if cluster_vectors:
             yield np.array(cluster_vectors)
 
 
-def yield_label_vectors(labels_clusters, model):
-    for label, cluster in labels_clusters:
-        labels_vector = [label for item in cluster if item in model.vocab]
+def yield_label_vectors(labels_clusters, model, tokenizer):
+    for label, cluster in tqdm(labels_clusters, desc="Processing labels"):
+        labels_vector = [label for item in cluster if tokenizer is not None or item in model.vocab]
         if labels_vector:
             yield np.array(labels_vector)
 
 
-def score_dataset(model, dataset):
+def score_dataset(model, dataset, tokenizer):
     """Get score for one dataset for a given KeyedVectors model."""
     clustering_data = np.stack(list(itertools.chain.from_iterable(yield_item_vectors([
-        cluster for label, cluster in dataset
-    ], model))))
-    true_clustering = np.array(list(itertools.chain.from_iterable(yield_label_vectors(dataset, model))))
+        cluster for label, cluster in tqdm(dataset, desc="Processing Dataset")
+    ], model, tokenizer))))
+    true_clustering = np.array(list(itertools.chain.from_iterable(yield_label_vectors(dataset, model, tokenizer))))
     vector_clustering = KMeans(n_clusters=np.max(true_clustering) + 1).fit_predict(clustering_data)
 
     return normalized_mutual_info_score(true_clustering, vector_clustering, average_method='arithmetic')
 
 
-def score_model(model, datasets):
+def score_model(model, datasets, tokenizer):
     """Get scores for all datasets."""
 
-    for dataset_name in sorted(datasets.keys()):
-        yield score_dataset(model, datasets[dataset_name])
+    for dataset_name in tqdm(sorted(datasets.keys()), desc="Processing Datasets"):
+        yield score_dataset(model, datasets[dataset_name], tokenizer)
 
 
 def load_model(name):
@@ -131,6 +139,7 @@ def main():
     parser.add_argument("models", nargs="+")
     parser.add_argument("--benchmarks", nargs="+", default=list(DATASETS.keys()))
     parser.add_argument("--data-dir", type=str, help="Path to data")
+    parser.add_argument("--tokenizer", type=str, help="Tokenizer to use")
     args = parser.parse_args()
 
     models = {
@@ -140,11 +149,12 @@ def main():
     datasets = {
         n: list(dataset_rows_to_clusters(load_dataset(n, os.path.join(args.data_dir, n)))) for n in args.benchmarks
     }
+    tokenizer = make_tokenizer(args.tokenizer)
 
     output = csv.writer(sys.stdout)
     output.writerow(['model'] + sorted(datasets.keys()))
-    for model_name in sorted(models.keys()):
-        output.writerow([model_name] + list(score_model(models[model_name], datasets)))
+    for model_name in tqdm(sorted(models.keys()), desc="Processing Models"):
+        output.writerow([model_name] + list(score_model(models[model_name], datasets, tokenizer)))
 
 
 if __name__ == "__main__":

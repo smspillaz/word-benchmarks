@@ -28,6 +28,10 @@ from gensim.models import KeyedVectors
 
 from sklearn.metrics.pairwise import cosine_similarity
 
+from tqdm.auto import tqdm
+
+from util import make_vec, make_tokenizer
+
 
 Dataset = namedtuple("Dataset", "w1 w2 w3 target")
 
@@ -56,25 +60,28 @@ def load_dataset(name, path):
             yield first, second, third, target
 
 
-def score_dataset(model, dataset):
+def score_dataset(model, dataset, tokenizer):
     """Get score for one dataset for a given KeyedVectors model."""
+    tfunc = tokenizer.tokenize if tokenizer else lambda x: [x]
     similarities = [
-        cosine_similarity(np.array([model[second] - model[first] + model[third]]),
-                          np.array([model[target]]))[0]
-        for first, second, third, target in dataset
+        cosine_similarity(np.array([make_vec(model, tfunc(second)) - make_vec(model, tfunc(first)) + make_vec(model, tfunc(third))]),
+                          np.array([make_vec(model, tfunc(target))]))[0]
+        for first, second, third, target in tqdm(dataset, desc="Processing dataset")
         if (
-            first in model.vocab and second in model.vocab and
-            third in model.vocab and target in model.vocab
+            tokenizer is not None or (
+                first in model.vocab and second in model.vocab and
+                third in model.vocab and target in model.vocab
+            )
         )
     ]
     return np.mean(similarities) if similarities else 0
 
 
-def score_model(model, datasets):
+def score_model(model, datasets, tokenizer):
     """Get scores for all datasets."""
 
-    for dataset_name in sorted(datasets.keys()):
-        yield score_dataset(model, datasets[dataset_name])
+    for dataset_name in tqdm(sorted(datasets.keys()), desc="Processing datasets"):
+        yield score_dataset(model, datasets[dataset_name], tokenizer)
 
 
 def load_model(name):
@@ -88,6 +95,7 @@ def main():
     parser.add_argument("models", nargs="+")
     parser.add_argument("--benchmarks", nargs="+", default=list(DATASETS.keys()))
     parser.add_argument("--data-dir", type=str, help="Path to data")
+    parser.add_argument("--tokenizer", type=str, help="Tokenizer to use.")
     args = parser.parse_args()
 
     datasets = {
@@ -99,8 +107,11 @@ def main():
 
     output = csv.writer(sys.stdout)
     output.writerow(['model'] + sorted(datasets.keys()))
-    for model_name in sorted(models.keys()):
-        output.writerow([model_name] + list(score_model(models[model_name], datasets)))
+    tokenizer = make_tokenizer(args.tokenizer)
+    for model_name in tqdm(sorted(models.keys()), desc="Processing model"):
+        output.writerow(
+            [model_name] + list(score_model(models[model_name], datasets, tokenizer))
+        )
 
 
 if __name__ == "__main__":
