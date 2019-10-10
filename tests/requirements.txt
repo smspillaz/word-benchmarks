@@ -1,0 +1,5 @@
+scikit-learn==0.21.3
+pandas==0.23.0
+pytorch-transformers==1.2.0
+numpy==1.17.0
+markdown-table==2019.4.13
